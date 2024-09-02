@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Analysis Service</title>
+    <style>
+        body {
+            background-color: #1a1a40;
+            color: #ffffff;
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            color: #f0e68c;
+        }
+
+        .tab {
+            overflow: hidden;
+            border-bottom: 1px solid #ccc;
+        }
+
+        .tab button {
+            background-color: inherit;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 14px 16px;
+            transition: background-color 0.3s ease;
+            font-size: 1em;
+            color: #ffffff;
+        }
+
+        .tab button:hover {
+            background-color: #555;
+        }
+
+        .tab button.active {
+            background-color: #333;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 20px;
+            background-color: #2a2a5f;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        button {
+            background-color: #ff6600;
+            color: #ffffff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #ff8533;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        input[type="file"] {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #ffffff;
+            color: #000000;
+            font-size: 1em;
+        }
+
+        #analysis-result {
+            background-color: #2a2a5f;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            margin-top: 20px;
+            font-size: 1.2em;
+        }
+
+        img {
+            display: block;
+            margin: 20px auto;
+            border-radius: 10px;
+            max-width: 100%;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Chat styles */
+        #chat-box {
+            background-color: #2a2a5f;
+            padding: 20px;
+            border-radius: 10px;
+            height: 300px;
+            overflow-y: scroll;
+            margin-bottom: 20px;
+        }
+
+        #chat-input {
+            width: calc(100% - 110px);
+            padding: 10px;
+            margin-right: 10px;
+            border-radius: 5px;
+            border: none;
+        }
+
+        .chat-message {
+            margin-bottom: 10px;
+        }
+
+        .user-message {
+            color: #ff8533;
+        }
+
+        .bot-message {
+            color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+    <h1>Image Analysis Service</h1>
+    
+    <!-- Tab links -->
+    <div class="tab">
+        <button class="tablinks active" onclick="openTab(event, 'AddPicture')">Add Picture</button>
+        <button class="tablinks" onclick="openTab(event, 'Results')">Results</button>
+        <button class="tablinks" onclick="openTab(event, 'Discussion')">Discussion</button>
+    </div>
+
+    <!-- Add Picture Tab -->
+    <div id="AddPicture" class="tab-content active">
+        <p>Capture an image or upload to analyze using the OpenAI API</p>
+        <form id="upload-form" enctype="multipart/form-data">
+            <input type="file" id="image-file" name="file" accept="image/*" required>
+            <button type="submit">Upload and Analyze</button>
+        </form>
+    </div>
+
+    <!-- Results Tab -->
+    <div id="Results" class="tab-content">
+        <h2>Analysis Result</h2>
+        <div id="analysis-result"></div>
+        <h2>Uploaded Image</h2>
+        <img id="uploaded-image" src="" alt="Uploaded Image">
+    </div>
+
+    <!-- Discussion Tab -->
+    <div id="Discussion" class="tab-content">
+        <h2>Discuss with ChatGPT</h2>
+        <div id="chat-box"></div>
+        <input type="text" id="chat-input" placeholder="Type your message..." />
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <script>
+        let currentAnalysis = "";
+
+        function openTab(evt, tabName) {
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tab-content");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].classList.remove("active");
+            }
+            tablinks = document.getElementsByClassName("tablinks");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            document.getElementById(tabName).classList.add("active");
+            if (evt) {
+                evt.currentTarget.className += " active";
+            }
+        }
+
+        document.getElementById("upload-form").addEventListener("submit", async function(event) {
+            event.preventDefault();
+
+            const formData = new FormData();
+            const fileField = document.getElementById('image-file');
+
+            if (fileField.files.length === 0) {
+                alert("Please select an image file first.");
+                return;
+            }
+
+            console.log("File selected: ", fileField.files[0]);
+
+            if (fileField.files[0].size > 5 * 1024 * 1024) { 
+                alert("File is too large! Please select a smaller image.");
+                return;
+            }
+
+            formData.append('file', fileField.files[0]);
+
+            try {
+                const response = await fetch("http://192.168.1.51:8000/upload_and_analyze_image/", {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                const result = await response.json();
+                const analysis = JSON.parse(result.result);
+                currentAnalysis = result.result; // Store the result for discussion
+                console.log("Received analysis:", analysis);
+
+                let outputHTML = `<h3>Reasoning</h3><p>${analysis.reasoning}</p>`;
+                outputHTML += `<h3>Food Items</h3><ul>`;
+
+                analysis.food_items.forEach(item => {
+                    outputHTML += `<li>${item.name}: ${item.calories}</li>`;
+                });
+
+                outputHTML += `</ul>`;
+                outputHTML += `<h3>Total Calories</h3><p>${analysis.total}</p>`;
+                document.getElementById("analysis-result").innerHTML = outputHTML;
+
+                if (result.image) {
+                    const imgResponse = await fetch(result.image);
+                    const imgBlob = await imgResponse.blob();
+                    const imgURL = URL.createObjectURL(imgBlob);
+                    document.getElementById("uploaded-image").src = imgURL;
+                } else {
+                    console.error("No image URL returned from the backend.");
+                }
+
+                openTab(null, 'Results');  // Navigate to the results tab after upload and analysis
+
+            } catch (error) {
+                console.error('There was a problem with the fetch operation:', error);
+            }
+        });
+
+        async function sendMessage() {
+            const message = document.getElementById("chat-input").value;
+            if (message.trim() === "") return;
+
+            // Display the user's message in the chat box
+            const chatBox = document.getElementById("chat-box");
+            chatBox.innerHTML += `<div class="chat-message user-message"><strong>You:</strong> ${message}</div>`;
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            document.getElementById("chat-input").value = ""; 
+
+            try {
+                const response = await fetch("http://192.168.1.51:8000/chat", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        context: currentAnalysis 
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                const result = await response.json();
+                chatBox.innerHTML += `<div class="chat-message bot-message"><strong>ChatGPT:</strong> ${result.reply}</div>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+
+            } catch (error) {
+                console.error('There was a problem with the chat operation:', error);
+            }
+        }
+    </script>
+</body>
+</html>
